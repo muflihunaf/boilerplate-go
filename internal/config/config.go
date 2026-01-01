@@ -19,9 +19,10 @@ type Config struct {
 	WriteTimeout time.Duration
 	IdleTimeout  time.Duration
 
-	// Add your config fields here
-	// DatabaseURL string
-	// JWTSecret   string
+	// JWT settings
+	JWTSecret     string
+	JWTExpiration time.Duration
+	JWTIssuer     string
 }
 
 func Load() (*Config, error) {
@@ -29,12 +30,15 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	return &Config{
-		Env:          getEnv("APP_ENV", "development"),
-		Port:         getEnv("PORT", "8080"),
-		LogLevel:     getEnv("LOG_LEVEL", "info"),
-		ReadTimeout:  getDurationEnv("READ_TIMEOUT", 15*time.Second),
-		WriteTimeout: getDurationEnv("WRITE_TIMEOUT", 15*time.Second),
-		IdleTimeout:  getDurationEnv("IDLE_TIMEOUT", 60*time.Second),
+		Env:           getEnv("APP_ENV", "development"),
+		Port:          getEnv("PORT", "8080"),
+		LogLevel:      getEnv("LOG_LEVEL", "info"),
+		ReadTimeout:   getDurationEnv("READ_TIMEOUT", 15*time.Second),
+		WriteTimeout:  getDurationEnv("WRITE_TIMEOUT", 15*time.Second),
+		IdleTimeout:   getDurationEnv("IDLE_TIMEOUT", 60*time.Second),
+		JWTSecret:     getEnv("JWT_SECRET", "change-me-in-production"),
+		JWTExpiration: getDurationEnv("JWT_EXPIRATION", 24*time.Hour),
+		JWTIssuer:     getEnv("JWT_ISSUER", "boilerplate-go"),
 	}, nil
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/muflihunaf/boilerplate-go/internal/repository"
 	"github.com/muflihunaf/boilerplate-go/internal/server"
 	"github.com/muflihunaf/boilerplate-go/internal/service"
+	"github.com/muflihunaf/boilerplate-go/pkg/jwt"
 )
 
 // App holds all application dependencies.
@@ -35,13 +36,20 @@ func New() (*App, error) {
 	// Initialize logger
 	logger := initLogger(cfg)
 
+	// Initialize JWT service
+	jwtService := jwt.NewService(jwt.Config{
+		Secret:     cfg.JWTSecret,
+		Expiration: cfg.JWTExpiration,
+		Issuer:     cfg.JWTIssuer,
+	})
+
 	// Initialize layers (dependency injection)
 	repo := repository.New()
 	svc := service.New(repo)
-	h := handler.New(svc)
+	h := handler.New(svc, jwtService)
 
 	// Create server
-	srv := server.New(cfg, h, logger)
+	srv := server.New(cfg, h, jwtService, logger)
 
 	return &App{
 		cfg:    cfg,

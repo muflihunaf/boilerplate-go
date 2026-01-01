@@ -11,6 +11,8 @@ import (
 
 	"github.com/muflihunaf/boilerplate-go/internal/config"
 	"github.com/muflihunaf/boilerplate-go/internal/handler"
+	authMiddleware "github.com/muflihunaf/boilerplate-go/internal/middleware"
+	"github.com/muflihunaf/boilerplate-go/pkg/jwt"
 )
 
 type Server struct {
@@ -19,7 +21,7 @@ type Server struct {
 	logger     *slog.Logger
 }
 
-func New(cfg *config.Config, h *handler.Handler, logger *slog.Logger) *Server {
+func New(cfg *config.Config, h *handler.Handler, jwtService *jwt.Service, logger *slog.Logger) *Server {
 	r := chi.NewRouter()
 
 	// Production-ready middleware stack
@@ -34,7 +36,7 @@ func New(cfg *config.Config, h *handler.Handler, logger *slog.Logger) *Server {
 	r.Use(corsMiddleware)
 
 	// Register routes
-	registerRoutes(r, h)
+	registerRoutes(r, h, jwtService)
 
 	return &Server{
 		httpServer: &http.Server{
@@ -57,25 +59,34 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-func registerRoutes(r *chi.Mux, h *handler.Handler) {
+func registerRoutes(r *chi.Mux, h *handler.Handler, jwtService *jwt.Service) {
 	// Health check (public)
 	r.Get("/health", h.Health)
 
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
-		// Example: Users resource
-		r.Route("/users", func(r chi.Router) {
-			r.Get("/", h.ListUsers)
-			r.Post("/", h.CreateUser)
+		// Public routes
+		r.Post("/auth/login", h.Login)
 
-			r.Route("/{id}", func(r chi.Router) {
-				r.Get("/", h.GetUser)
-				r.Put("/", h.UpdateUser)
-				r.Delete("/", h.DeleteUser)
+		// Protected routes (require JWT)
+		r.Group(func(r chi.Router) {
+			r.Use(authMiddleware.Auth(jwtService))
+
+			// Users resource (protected)
+			r.Route("/users", func(r chi.Router) {
+				r.Get("/", h.ListUsers)
+				r.Post("/", h.CreateUser)
+
+				r.Route("/{id}", func(r chi.Router) {
+					r.Get("/", h.GetUser)
+					r.Put("/", h.UpdateUser)
+					r.Delete("/", h.DeleteUser)
+				})
 			})
-		})
 
-		// Add more resources here
+			// Example: Get current authenticated user
+			r.Get("/me", h.Me)
+		})
 	})
 }
 
@@ -93,4 +104,3 @@ func corsMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-

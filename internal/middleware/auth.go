@@ -5,65 +5,66 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/muflihunaf/boilerplate-go/internal/handler"
+	"github.com/muflihunaf/boilerplate-go/pkg/jwt"
+	"github.com/muflihunaf/boilerplate-go/pkg/response"
 )
 
 type contextKey string
 
 const (
 	UserIDKey contextKey = "user_id"
+	EmailKey  contextKey = "email"
 )
 
-// Auth is a middleware that validates authentication tokens.
-// Replace with your actual auth logic (JWT, session, API key, etc.)
-func Auth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			handler.Unauthorized(w, "missing authorization header")
-			return
-		}
+// Auth creates a JWT authentication middleware.
+func Auth(jwtService *jwt.Service) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				response.Unauthorized(w, "missing authorization header")
+				return
+			}
 
-		// Example: Bearer token parsing
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			handler.Unauthorized(w, "invalid authorization header format")
-			return
-		}
+			// Extract Bearer token
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				response.Unauthorized(w, "invalid authorization header format")
+				return
+			}
 
-		token := parts[1]
+			tokenString := parts[1]
 
-		// TODO: Validate token and extract user ID
-		// This is a placeholder - implement your actual token validation
-		userID, err := validateToken(token)
-		if err != nil {
-			handler.Unauthorized(w, "invalid token")
-			return
-		}
+			// Validate token
+			claims, err := jwtService.ValidateToken(tokenString)
+			if err != nil {
+				switch err {
+				case jwt.ErrExpiredToken:
+					response.Unauthorized(w, "token has expired")
+				default:
+					response.Unauthorized(w, "invalid token")
+				}
+				return
+			}
 
-		// Add user ID to context
-		ctx := context.WithValue(r.Context(), UserIDKey, userID)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+			// Add claims to context
+			ctx := r.Context()
+			ctx = context.WithValue(ctx, UserIDKey, claims.UserID)
+			ctx = context.WithValue(ctx, EmailKey, claims.Email)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
-// GetUserID extracts user ID from context
+// GetUserID extracts user ID from context.
 func GetUserID(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value(UserIDKey).(string)
 	return userID, ok
 }
 
-// validateToken is a placeholder for actual token validation
-func validateToken(token string) (string, error) {
-	// TODO: Implement actual JWT/token validation
-	// Example with JWT:
-	//   claims, err := jwt.Parse(token, secret)
-	//   return claims.UserID, err
-
-	// For now, just return the token as user ID (placeholder)
-	if token == "" {
-		return "", http.ErrNoCookie
-	}
-	return token, nil
+// GetEmail extracts email from context.
+func GetEmail(ctx context.Context) (string, bool) {
+	email, ok := ctx.Value(EmailKey).(string)
+	return email, ok
 }
-
