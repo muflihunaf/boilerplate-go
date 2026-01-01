@@ -34,4 +34,3 @@ func New() *Repository {
 //	func New(db *gorm.DB) *Repository {
 //	    return &Repository{db: db}
 //	}
-

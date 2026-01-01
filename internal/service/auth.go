@@ -104,4 +104,3 @@ func (s *AuthService) GetCurrentUser(ctx context.Context, userID string) (*repos
 	}
 	return user, nil
 }
-

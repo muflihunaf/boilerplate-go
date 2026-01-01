@@ -139,4 +139,3 @@ func parseLogLevel(level string) slog.Level {
 		return slog.LevelInfo
 	}
 }
-
