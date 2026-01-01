@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+bin/
+tmp/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*.test
+coverage.out
+coverage.html
+
+# Environment files (should be provided at runtime)
+.env
+.env.*
+
+# Documentation (not needed in container)
+*.md
+docs/
+!docs/swagger.json
+!docs/swagger.yaml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Development files
+.air.toml
+Makefile
+
+# Logs
+*.log
+logs/
+
