@@ -2,18 +2,16 @@ package handler
 
 import (
 	"github.com/muflihunaf/boilerplate-go/internal/service"
-	"github.com/muflihunaf/boilerplate-go/pkg/jwt"
 )
 
 type Handler struct {
-	svc *service.Service
-	jwt *jwt.Service
+	svc     *service.Service
+	authSvc *service.AuthService
 }
 
-func New(svc *service.Service, jwtService *jwt.Service) *Handler {
+func New(svc *service.Service, authSvc *service.AuthService) *Handler {
 	return &Handler{
-		svc: svc,
-		jwt: jwtService,
+		svc:     svc,
+		authSvc: authSvc,
 	}
 }
-

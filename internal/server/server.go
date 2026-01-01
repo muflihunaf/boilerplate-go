@@ -65,12 +65,18 @@ func registerRoutes(r *chi.Mux, h *handler.Handler, jwtService *jwt.Service) {
 
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
-		// Public routes
-		r.Post("/auth/login", h.Login)
+		// Public routes (no auth required)
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/login", h.Login)
+			r.Post("/register", h.Register)
+		})
 
 		// Protected routes (require JWT)
 		r.Group(func(r chi.Router) {
 			r.Use(authMiddleware.Auth(jwtService))
+
+			// Current user
+			r.Get("/me", h.Me)
 
 			// Users resource (protected)
 			r.Route("/users", func(r chi.Router) {
@@ -83,9 +89,6 @@ func registerRoutes(r *chi.Mux, h *handler.Handler, jwtService *jwt.Service) {
 					r.Delete("/", h.DeleteUser)
 				})
 			})
-
-			// Example: Get current authenticated user
-			r.Get("/me", h.Me)
 		})
 	})
 }

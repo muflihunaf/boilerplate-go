@@ -46,7 +46,8 @@ func New() (*App, error) {
 	// Initialize layers (dependency injection)
 	repo := repository.New()
 	svc := service.New(repo)
-	h := handler.New(svc, jwtService)
+	authSvc := service.NewAuthService(repo, jwtService, cfg.JWTExpiration)
+	h := handler.New(svc, authSvc)
 
 	// Create server
 	srv := server.New(cfg, h, jwtService, logger)

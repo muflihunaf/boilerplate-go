@@ -4,21 +4,38 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/muflihunaf/boilerplate-go/pkg/jwt"
+	"github.com/muflihunaf/boilerplate-go/internal/middleware"
+	"github.com/muflihunaf/boilerplate-go/internal/service"
 )
 
+// LoginRequest represents the login request body.
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
 }
 
-type LoginResponse struct {
-	Token     string `json:"token"`
-	ExpiresIn int64  `json:"expires_in"`
+// RegisterRequest represents the registration request body.
+type RegisterRequest struct {
+	Name     string `json:"name" validate:"required,min=2,max=100"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=6"`
+}
+
+// AuthResponse represents the authentication response.
+type AuthResponse struct {
+	Token     string       `json:"token"`
+	ExpiresIn int64        `json:"expires_in"`
+	User      UserResponse `json:"user"`
+}
+
+// UserResponse represents user data in responses.
+type UserResponse struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
 
 // Login authenticates a user and returns a JWT token.
-// This is a simplified example - in production, verify against your user store.
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -31,67 +48,90 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: In production, verify credentials against your user store
-	// Example:
-	//   user, err := h.svc.AuthenticateUser(r.Context(), req.Email, req.Password)
-	//   if err != nil {
-	//       Unauthorized(w, "invalid credentials")
-	//       return
-	//   }
-
-	// For demo purposes, accept any email/password
-	// Replace with actual authentication logic
-	userID := "demo-user-id"
-
-	token, err := h.jwt.GenerateToken(userID, req.Email)
+	result, err := h.authSvc.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
-		InternalError(w)
+		switch err {
+		case service.ErrInvalidCredentials:
+			Unauthorized(w, "invalid email or password")
+		default:
+			InternalError(w)
+		}
 		return
 	}
 
-	JSON(w, http.StatusOK, LoginResponse{
-		Token:     token,
+	JSON(w, http.StatusOK, AuthResponse{
+		Token:     result.Token,
 		ExpiresIn: 86400, // 24 hours in seconds
+		User: UserResponse{
+			ID:    result.User.ID,
+			Name:  result.User.Name,
+			Email: result.User.Email,
+		},
 	})
 }
 
-// AuthHandler holds auth-specific dependencies.
-type AuthHandler struct {
-	jwt *jwt.Service
-}
-
-// NewAuthHandler creates a new auth handler.
-func NewAuthHandler(jwtService *jwt.Service) *AuthHandler {
-	return &AuthHandler{
-		jwt: jwtService,
-	}
-}
-
-// Login authenticates and returns a JWT token.
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var req LoginRequest
+// Register creates a new user and returns a JWT token.
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		BadRequest(w, "invalid request body")
 		return
 	}
 
-	if req.Email == "" || req.Password == "" {
-		BadRequest(w, "email and password are required")
+	if req.Name == "" || req.Email == "" || req.Password == "" {
+		BadRequest(w, "name, email and password are required")
 		return
 	}
 
-	// TODO: Verify credentials against your user store
-	userID := "demo-user-id"
+	if len(req.Password) < 6 {
+		BadRequest(w, "password must be at least 6 characters")
+		return
+	}
 
-	token, err := h.jwt.GenerateToken(userID, req.Email)
+	result, err := h.authSvc.Register(r.Context(), req.Name, req.Email, req.Password)
 	if err != nil {
-		InternalError(w)
+		switch err {
+		case service.ErrConflict:
+			Error(w, http.StatusConflict, "CONFLICT", "email already registered")
+		default:
+			InternalError(w)
+		}
 		return
 	}
 
-	JSON(w, http.StatusOK, LoginResponse{
-		Token:     token,
+	JSON(w, http.StatusCreated, AuthResponse{
+		Token:     result.Token,
 		ExpiresIn: 86400,
+		User: UserResponse{
+			ID:    result.User.ID,
+			Name:  result.User.Name,
+			Email: result.User.Email,
+		},
 	})
 }
 
+// Me returns the current authenticated user's information.
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		Unauthorized(w, "user not found in context")
+		return
+	}
+
+	user, err := h.authSvc.GetCurrentUser(r.Context(), userID)
+	if err != nil {
+		switch err {
+		case service.ErrUserNotFound:
+			NotFound(w, "user not found")
+		default:
+			InternalError(w)
+		}
+		return
+	}
+
+	JSON(w, http.StatusOK, UserResponse{
+		ID:    user.ID,
+		Name:  user.Name,
+		Email: user.Email,
+	})
+}

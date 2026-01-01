@@ -88,4 +88,3 @@ func (s *Service) ValidateToken(tokenString string) (*Claims, error) {
 
 	return claims, nil
 }
-

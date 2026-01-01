@@ -7,6 +7,7 @@ import (
 
 var (
 	ErrNotFound = errors.New("not found")
+	ErrConflict = errors.New("resource already exists")
 )
 
 // Repository handles data persistence.

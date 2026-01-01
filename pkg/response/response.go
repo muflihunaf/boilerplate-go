@@ -88,4 +88,3 @@ func Forbidden(w http.ResponseWriter, message string) {
 func ValidationError(w http.ResponseWriter, message string) {
 	Error(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", message)
 }
-

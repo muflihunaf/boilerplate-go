@@ -6,12 +6,15 @@ import (
 
 	"crypto/rand"
 	"encoding/hex"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	Email     string    `json:"email"`
+	Password  string    `json:"-"` // Never expose password in JSON
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -38,6 +41,18 @@ func (r *Repository) GetUser(ctx context.Context, id string) (*User, error) {
 	return user, nil
 }
 
+func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, u := range r.users {
+		if u.Email == email {
+			return u, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
 func (r *Repository) CreateUser(ctx context.Context, name, email string) (*User, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -49,6 +64,39 @@ func (r *Repository) CreateUser(ctx context.Context, name, email string) (*User,
 		ID:        id,
 		Name:      name,
 		Email:     email,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	r.users[id] = user
+	return user, nil
+}
+
+func (r *Repository) CreateUserWithPassword(ctx context.Context, name, email, password string) (*User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Check if email already exists
+	for _, u := range r.users {
+		if u.Email == email {
+			return nil, ErrConflict
+		}
+	}
+
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	id := generateID()
+	now := time.Now()
+
+	user := &User{
+		ID:        id,
+		Name:      name,
+		Email:     email,
+		Password:  string(hashedPassword),
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -89,9 +137,14 @@ func (r *Repository) DeleteUser(ctx context.Context, id string) error {
 	return nil
 }
 
+// CheckPassword compares a hashed password with a plain text password.
+func (r *Repository) CheckPassword(hashedPassword, password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	return err == nil
+}
+
 func generateID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
-
