@@ -9,8 +9,10 @@ import (
 )
 
 type Config struct {
-	Env  string
-	Port string
+	// Application
+	Env      string
+	Port     string
+	LogLevel string
 
 	// Server settings
 	ReadTimeout  time.Duration
@@ -29,6 +31,7 @@ func Load() (*Config, error) {
 	return &Config{
 		Env:          getEnv("APP_ENV", "development"),
 		Port:         getEnv("PORT", "8080"),
+		LogLevel:     getEnv("LOG_LEVEL", "info"),
 		ReadTimeout:  getDurationEnv("READ_TIMEOUT", 15*time.Second),
 		WriteTimeout: getDurationEnv("WRITE_TIMEOUT", 15*time.Second),
 		IdleTimeout:  getDurationEnv("IDLE_TIMEOUT", 60*time.Second),

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -15,9 +16,10 @@ import (
 type Server struct {
 	httpServer *http.Server
 	router     *chi.Mux
+	logger     *slog.Logger
 }
 
-func New(cfg *config.Config, h *handler.Handler) *Server {
+func New(cfg *config.Config, h *handler.Handler, logger *slog.Logger) *Server {
 	r := chi.NewRouter()
 
 	// Production-ready middleware stack
@@ -43,6 +45,7 @@ func New(cfg *config.Config, h *handler.Handler) *Server {
 			IdleTimeout:  cfg.IdleTimeout,
 		},
 		router: r,
+		logger: logger,
 	}
 }
 
