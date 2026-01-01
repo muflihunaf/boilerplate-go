@@ -1,8 +1,9 @@
 package handler
 
 import (
-	"github.com/muflihunaf/boilerplate-go/pkg/response"
 	"net/http"
+
+	"github.com/muflihunaf/boilerplate-go/pkg/response"
 )
 
 // Re-export response types for handler convenience
@@ -15,6 +16,10 @@ var (
 	JSON         = response.JSON
 	JSONWithMeta = response.JSONWithMeta
 	Error        = response.Error
+	OK           = response.OK
+	Created      = response.Created
+	NoContent    = response.NoContent
+	Paginated    = response.Paginated
 )
 
 // Common error responses
@@ -38,6 +43,10 @@ func Forbidden(w http.ResponseWriter, message string) {
 	response.Forbidden(w, message)
 }
 
-func ValidationError(w http.ResponseWriter, message string) {
-	response.ValidationError(w, message)
+func Conflict(w http.ResponseWriter, message string) {
+	response.Conflict(w, message)
+}
+
+func ValidationError(w http.ResponseWriter, message string, details map[string]string) {
+	response.ValidationError(w, message, details)
 }
