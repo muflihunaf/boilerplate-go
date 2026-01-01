@@ -9,32 +9,32 @@ import (
 	"github.com/muflihunaf/boilerplate-go/internal/service"
 )
 
-// LoginRequest represents the login request body.
+// --- Request/Response Types ---
+
 type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email" example:"user@example.com"`
-	Password string `json:"password" validate:"required,min=6" example:"secret123"`
+	Email    string `json:"email" example:"user@example.com"`
+	Password string `json:"password" example:"secret123"`
 }
 
-// RegisterRequest represents the registration request body.
 type RegisterRequest struct {
-	Name     string `json:"name" validate:"required,min=2,max=100" example:"John Doe"`
-	Email    string `json:"email" validate:"required,email" example:"user@example.com"`
-	Password string `json:"password" validate:"required,min=6" example:"secret123"`
+	Name     string `json:"name" example:"John Doe"`
+	Email    string `json:"email" example:"user@example.com"`
+	Password string `json:"password" example:"secret123"`
 }
 
-// AuthResponse represents the authentication response.
 type AuthResponse struct {
-	Token     string       `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
-	ExpiresIn int64        `json:"expires_in" example:"86400"`
+	Token     string       `json:"token"`
+	ExpiresIn int64        `json:"expires_in"`
 	User      UserResponse `json:"user"`
 }
 
-// UserResponse represents user data in responses.
 type UserResponse struct {
-	ID    string `json:"id" example:"abc123def456"`
-	Name  string `json:"name" example:"John Doe"`
-	Email string `json:"email" example:"user@example.com"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
+
+// --- Handlers ---
 
 // Login godoc
 // @Summary      User login
@@ -46,7 +46,6 @@ type UserResponse struct {
 // @Success      200      {object}  AuthResponse
 // @Failure      400      {object}  response.Response
 // @Failure      401      {object}  response.Response
-// @Failure      500      {object}  response.Response
 // @Router       /auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
@@ -62,25 +61,16 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.authSvc.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
-		switch err {
-		case service.ErrInvalidCredentials:
+		if err == service.ErrInvalidCredentials {
 			Unauthorized(w, "invalid email or password")
-		default:
-			slog.Error("login failed", "error", err, "email", req.Email)
-			InternalError(w)
+			return
 		}
+		slog.Error("login failed", "error", err, "email", req.Email)
+		InternalError(w)
 		return
 	}
 
-	JSON(w, http.StatusOK, AuthResponse{
-		Token:     result.Token,
-		ExpiresIn: 86400,
-		User: UserResponse{
-			ID:    result.User.ID,
-			Name:  result.User.Name,
-			Email: result.User.Email,
-		},
-	})
+	OK(w, toAuthResponse(result))
 }
 
 // Register godoc
@@ -93,7 +83,6 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 // @Success      201      {object}  AuthResponse
 // @Failure      400      {object}  response.Response
 // @Failure      409      {object}  response.Response
-// @Failure      500      {object}  response.Response
 // @Router       /auth/register [post]
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
@@ -114,25 +103,16 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.authSvc.Register(r.Context(), req.Name, req.Email, req.Password)
 	if err != nil {
-		switch err {
-		case service.ErrConflict:
-			Error(w, http.StatusConflict, "CONFLICT", "email already registered")
-		default:
-			slog.Error("registration failed", "error", err, "email", req.Email)
-			InternalError(w)
+		if err == service.ErrConflict {
+			Conflict(w, "email already registered")
+			return
 		}
+		slog.Error("registration failed", "error", err, "email", req.Email)
+		InternalError(w)
 		return
 	}
 
-	JSON(w, http.StatusCreated, AuthResponse{
-		Token:     result.Token,
-		ExpiresIn: 86400,
-		User: UserResponse{
-			ID:    result.User.ID,
-			Name:  result.User.Name,
-			Email: result.User.Email,
-		},
-	})
+	Created(w, toAuthResponse(result))
 }
 
 // Me godoc
@@ -145,7 +125,6 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 // @Success      200  {object}  UserResponse
 // @Failure      401  {object}  response.Response
 // @Failure      404  {object}  response.Response
-// @Failure      500  {object}  response.Response
 // @Router       /me [get]
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
@@ -156,19 +135,25 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.authSvc.GetCurrentUser(r.Context(), userID)
 	if err != nil {
-		switch err {
-		case service.ErrUserNotFound:
+		if err == service.ErrUserNotFound {
 			NotFound(w, "user not found")
-		default:
-			slog.Error("get current user failed", "error", err, "user_id", userID)
-			InternalError(w)
+			return
 		}
+		slog.Error("get current user failed", "error", err, "user_id", userID)
+		InternalError(w)
 		return
 	}
 
-	JSON(w, http.StatusOK, UserResponse{
-		ID:    user.ID,
-		Name:  user.Name,
-		Email: user.Email,
-	})
+	OK(w, UserResponse{ID: user.ID, Name: user.Name, Email: user.Email})
 }
+
+// --- Helpers ---
+
+func toAuthResponse(r *service.AuthResult) AuthResponse {
+	return AuthResponse{
+		Token:     r.Token,
+		ExpiresIn: 86400,
+		User:      UserResponse{ID: r.User.ID, Name: r.User.Name, Email: r.User.Email},
+	}
+}
+

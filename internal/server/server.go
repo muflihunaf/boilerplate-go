@@ -12,25 +12,21 @@ import (
 	"github.com/muflihunaf/boilerplate-go/pkg/jwt"
 )
 
-// Server represents the HTTP server.
+// Server wraps the HTTP server.
 type Server struct {
-	httpServer *http.Server
-	router     *chi.Mux
-	logger     *slog.Logger
+	http   *http.Server
+	router *chi.Mux
+	log    *slog.Logger
 }
 
-// New creates a new HTTP server with all routes and middleware configured.
-func New(cfg *config.Config, h *handler.Handler, jwtService *jwt.Service, logger *slog.Logger) *Server {
+// New creates a configured HTTP server.
+func New(cfg *config.Config, h *handler.Handler, jwtSvc *jwt.Service, log *slog.Logger) *Server {
 	r := chi.NewRouter()
-
-	// Setup global middleware stack
 	SetupMiddleware(r)
-
-	// Register all routes
-	RegisterRoutes(r, h, jwtService)
+	RegisterRoutes(r, h, jwtSvc)
 
 	return &Server{
-		httpServer: &http.Server{
+		http: &http.Server{
 			Addr:         ":" + cfg.Port,
 			Handler:      r,
 			ReadTimeout:  cfg.ReadTimeout,
@@ -38,21 +34,21 @@ func New(cfg *config.Config, h *handler.Handler, jwtService *jwt.Service, logger
 			IdleTimeout:  cfg.IdleTimeout,
 		},
 		router: r,
-		logger: logger,
+		log:    log,
 	}
 }
 
-// Start begins listening for HTTP requests.
+// Start begins listening for requests.
 func (s *Server) Start() error {
-	return s.httpServer.ListenAndServe()
+	return s.http.ListenAndServe()
 }
 
 // Shutdown gracefully stops the server.
 func (s *Server) Shutdown(ctx context.Context) error {
-	return s.httpServer.Shutdown(ctx)
+	return s.http.Shutdown(ctx)
 }
 
-// Router returns the underlying chi router (for testing).
+// Router returns the chi router for testing.
 func (s *Server) Router() *chi.Mux {
 	return s.router
 }

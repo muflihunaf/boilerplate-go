@@ -16,51 +16,45 @@ const (
 	EmailKey  contextKey = "email"
 )
 
-// Auth creates a JWT authentication middleware.
-func Auth(jwtService *jwt.Service) func(http.Handler) http.Handler {
+// Auth validates JWT tokens and injects user claims into context.
+func Auth(jwtSvc *jwt.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
+			token := extractToken(r)
+			if token == "" {
 				response.Unauthorized(w, "missing authorization header")
 				return
 			}
 
-			// Extract Bearer token
-			parts := strings.SplitN(authHeader, " ", 2)
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				response.Unauthorized(w, "invalid authorization header format")
-				return
-			}
-
-			tokenString := parts[1]
-
-			// Validate token
-			claims, err := jwtService.ValidateToken(tokenString)
+			claims, err := jwtSvc.ValidateToken(token)
 			if err != nil {
-				switch err {
-				case jwt.ErrExpiredToken:
+				if err == jwt.ErrExpiredToken {
 					response.Unauthorized(w, "token has expired")
-				default:
+				} else {
 					response.Unauthorized(w, "invalid token")
 				}
 				return
 			}
 
-			// Add claims to context
-			ctx := r.Context()
-			ctx = context.WithValue(ctx, UserIDKey, claims.UserID)
+			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
 			ctx = context.WithValue(ctx, EmailKey, claims.Email)
-
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
+func extractToken(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if strings.HasPrefix(auth, "Bearer ") {
+		return strings.TrimPrefix(auth, "Bearer ")
+	}
+	return ""
+}
+
 // GetUserID extracts user ID from context.
 func GetUserID(ctx context.Context) (string, bool) {
-	userID, ok := ctx.Value(UserIDKey).(string)
-	return userID, ok
+	id, ok := ctx.Value(UserIDKey).(string)
+	return id, ok
 }
 
 // GetEmail extracts email from context.

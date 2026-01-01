@@ -1,7 +1,7 @@
 package config
 
 import (
-	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -9,73 +9,84 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var (
-	ErrMissingJWTSecret = errors.New("JWT_SECRET is required in production")
-)
-
+// Config holds all application configuration.
 type Config struct {
-	// Application
+	// App
 	Env      string
 	Port     string
 	LogLevel string
 
-	// Server settings
+	// Server
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 	IdleTimeout  time.Duration
 
-	// JWT settings
+	// JWT
 	JWTSecret     string
 	JWTExpiration time.Duration
 	JWTIssuer     string
 }
 
+// Load reads configuration from environment variables.
 func Load() (*Config, error) {
-	// Load .env file (ignore error if not exists)
-	_ = godotenv.Load()
+	_ = godotenv.Load() // Ignore error - .env is optional
 
-	env := getEnv("APP_ENV", "development")
-	jwtSecret := getEnv("JWT_SECRET", "")
-
-	// Require JWT_SECRET in production
-	if env == "production" && jwtSecret == "" {
-		return nil, ErrMissingJWTSecret
+	cfg := &Config{
+		Env:           env("APP_ENV", "development"),
+		Port:          env("PORT", "8080"),
+		LogLevel:      env("LOG_LEVEL", "info"),
+		ReadTimeout:   duration("READ_TIMEOUT", 15*time.Second),
+		WriteTimeout:  duration("WRITE_TIMEOUT", 15*time.Second),
+		IdleTimeout:   duration("IDLE_TIMEOUT", 60*time.Second),
+		JWTSecret:     env("JWT_SECRET", ""),
+		JWTExpiration: duration("JWT_EXPIRATION", 24*time.Hour),
+		JWTIssuer:     env("JWT_ISSUER", "boilerplate-go"),
 	}
 
-	// Use default only in development
-	if jwtSecret == "" {
-		jwtSecret = "dev-secret-do-not-use-in-production"
+	if err := cfg.validate(); err != nil {
+		return nil, err
 	}
 
-	// Validate JWT secret length (minimum 32 characters recommended)
-	if env == "production" && len(jwtSecret) < 32 {
-		return nil, errors.New("JWT_SECRET must be at least 32 characters in production")
-	}
-
-	return &Config{
-		Env:           env,
-		Port:          getEnv("PORT", "8080"),
-		LogLevel:      getEnv("LOG_LEVEL", "info"),
-		ReadTimeout:   getDurationEnv("READ_TIMEOUT", 15*time.Second),
-		WriteTimeout:  getDurationEnv("WRITE_TIMEOUT", 15*time.Second),
-		IdleTimeout:   getDurationEnv("IDLE_TIMEOUT", 60*time.Second),
-		JWTSecret:     jwtSecret,
-		JWTExpiration: getDurationEnv("JWT_EXPIRATION", 24*time.Hour),
-		JWTIssuer:     getEnv("JWT_ISSUER", "boilerplate-go"),
-	}, nil
+	return cfg, nil
 }
 
-func getEnv(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+// IsProd returns true if running in production.
+func (c *Config) IsProd() bool {
+	return c.Env == "production"
+}
+
+func (c *Config) validate() error {
+	// JWT secret is required in production
+	if c.IsProd() {
+		if c.JWTSecret == "" {
+			return fmt.Errorf("JWT_SECRET is required in production")
+		}
+		if len(c.JWTSecret) < 32 {
+			return fmt.Errorf("JWT_SECRET must be at least 32 characters")
+		}
+	}
+
+	// Default secret for development only
+	if c.JWTSecret == "" {
+		c.JWTSecret = "dev-secret-do-not-use-in-production"
+	}
+
+	return nil
+}
+
+// --- Helpers ---
+
+func env(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
 	return fallback
 }
 
-func getDurationEnv(key string, fallback time.Duration) time.Duration {
-	if value := os.Getenv(key); value != "" {
-		if seconds, err := strconv.Atoi(value); err == nil {
-			return time.Duration(seconds) * time.Second
+func duration(key string, fallback time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if sec, err := strconv.Atoi(v); err == nil {
+			return time.Duration(sec) * time.Second
 		}
 	}
 	return fallback

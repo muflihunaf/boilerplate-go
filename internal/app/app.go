@@ -21,116 +21,94 @@ import (
 // App holds all application dependencies.
 type App struct {
 	cfg    *config.Config
-	logger *slog.Logger
+	log    *slog.Logger
 	server *server.Server
 }
 
 // New creates a new application instance.
 func New() (*App, error) {
-	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, err
 	}
 
-	// Initialize logger
-	logger := initLogger(cfg)
-
-	// Initialize JWT service
-	jwtService := jwt.NewService(jwt.Config{
+	log := setupLogger(cfg)
+	jwtSvc := jwt.NewService(jwt.Config{
 		Secret:     cfg.JWTSecret,
 		Expiration: cfg.JWTExpiration,
 		Issuer:     cfg.JWTIssuer,
 	})
 
-	// Initialize layers (dependency injection)
+	// Wire dependencies
 	repo := repository.New()
 	svc := service.New(repo)
-	authSvc := service.NewAuthService(repo, jwtService, cfg.JWTExpiration)
+	authSvc := service.NewAuthService(repo, jwtSvc, cfg.JWTExpiration)
 	h := handler.New(svc, authSvc)
-
-	// Create server
-	srv := server.New(cfg, h, jwtService, logger)
 
 	return &App{
 		cfg:    cfg,
-		logger: logger,
-		server: srv,
+		log:    log,
+		server: server.New(cfg, h, jwtSvc, log),
 	}, nil
 }
 
-// Run starts the application and blocks until shutdown.
+// Run starts the server and blocks until shutdown.
 func (a *App) Run() error {
-	// Start server
-	errChan := make(chan error, 1)
+	errCh := make(chan error, 1)
 	go func() {
-		a.logger.Info("starting server",
-			"port", a.cfg.Port,
-			"env", a.cfg.Env,
-		)
+		a.log.Info("starting server", "port", a.cfg.Port, "env", a.cfg.Env)
 		if err := a.server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errChan <- err
+			errCh <- err
 		}
 	}()
 
-	// Wait for shutdown signal or error
-	return a.waitForShutdown(errChan)
+	return a.awaitShutdown(errCh)
 }
 
-func (a *App) waitForShutdown(errChan chan error) error {
+func (a *App) awaitShutdown(errCh chan error) error {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	select {
-	case err := <-errChan:
+	case err := <-errCh:
 		return err
 	case sig := <-quit:
-		a.logger.Info("received shutdown signal", "signal", sig.String())
+		a.log.Info("received signal", "signal", sig.String())
 	}
 
-	return a.shutdown()
-}
-
-func (a *App) shutdown() error {
-	a.logger.Info("shutting down server...")
-
+	a.log.Info("shutting down...")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := a.server.Shutdown(ctx); err != nil {
-		a.logger.Error("server forced to shutdown", "error", err)
+		a.log.Error("shutdown error", "error", err)
 		return err
 	}
 
-	a.logger.Info("server exited gracefully")
+	a.log.Info("server stopped")
 	return nil
 }
 
-func initLogger(cfg *config.Config) *slog.Logger {
-	var handler slog.Handler
+func setupLogger(cfg *config.Config) *slog.Logger {
+	level := parseLevel(cfg.LogLevel)
+	opts := &slog.HandlerOptions{Level: level}
 
-	opts := &slog.HandlerOptions{
-		Level: parseLogLevel(cfg.LogLevel),
-	}
-
-	if cfg.Env == "production" {
-		handler = slog.NewJSONHandler(os.Stdout, opts)
+	var h slog.Handler
+	if cfg.IsProd() {
+		h = slog.NewJSONHandler(os.Stdout, opts)
 	} else {
-		handler = slog.NewTextHandler(os.Stdout, opts)
+		h = slog.NewTextHandler(os.Stdout, opts)
 	}
 
-	logger := slog.New(handler)
+	logger := slog.New(h)
 	slog.SetDefault(logger)
-
 	return logger
 }
 
-func parseLogLevel(level string) slog.Level {
-	switch level {
+func parseLevel(s string) slog.Level {
+	switch s {
 	case "debug":
 		return slog.LevelDebug
-	case "info":
-		return slog.LevelInfo
 	case "warn":
 		return slog.LevelWarn
 	case "error":
