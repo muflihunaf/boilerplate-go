@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/muflihunaf/boilerplate-go/internal/middleware"
@@ -65,6 +66,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		case service.ErrInvalidCredentials:
 			Unauthorized(w, "invalid email or password")
 		default:
+			slog.Error("login failed", "error", err, "email", req.Email)
 			InternalError(w)
 		}
 		return
@@ -116,6 +118,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		case service.ErrConflict:
 			Error(w, http.StatusConflict, "CONFLICT", "email already registered")
 		default:
+			slog.Error("registration failed", "error", err, "email", req.Email)
 			InternalError(w)
 		}
 		return
@@ -157,6 +160,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		case service.ErrUserNotFound:
 			NotFound(w, "user not found")
 		default:
+			slog.Error("get current user failed", "error", err, "user_id", userID)
 			InternalError(w)
 		}
 		return

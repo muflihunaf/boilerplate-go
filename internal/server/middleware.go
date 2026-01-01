@@ -7,6 +7,11 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
+const (
+	// MaxBodySize is the maximum allowed request body size (1MB)
+	MaxBodySize = 1 << 20 // 1 MB
+)
+
 // SetupMiddleware configures the global middleware stack.
 // Order matters: middleware is executed in the order it's added.
 func SetupMiddleware(r interface{ Use(middlewares ...func(http.Handler) http.Handler) }) {
@@ -33,6 +38,9 @@ func SetupMiddleware(r interface{ Use(middlewares ...func(http.Handler) http.Han
 
 	// Security headers
 	r.Use(SecureHeaders)
+
+	// Limit request body size
+	r.Use(LimitBodySize(MaxBodySize))
 }
 
 // CORS middleware handles Cross-Origin Resource Sharing.
@@ -77,6 +85,16 @@ func ContentType(contentType string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", contentType)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// LimitBodySize limits the maximum size of request bodies.
+func LimitBodySize(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 			next.ServeHTTP(w, r)
 		})
 	}

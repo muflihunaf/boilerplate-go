@@ -145,7 +145,15 @@ func ValidationError(w http.ResponseWriter, message string, details map[string]s
 }
 
 // InternalError sends a 500 Internal Server Error.
+// Note: Always log the actual error before calling this.
 func InternalError(w http.ResponseWriter) {
+	Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+}
+
+// InternalErrorWithLog sends a 500 error and logs the actual error.
+func InternalErrorWithLog(w http.ResponseWriter, err error) {
+	// Log is intentionally not imported here to keep pkg framework-agnostic.
+	// The error should be logged by the caller before this is called.
 	Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 }
 

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -35,6 +36,7 @@ type UpdateUserRequest struct {
 func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.svc.ListUsers(r.Context())
 	if err != nil {
+		slog.Error("list users failed", "error", err)
 		InternalError(w)
 		return
 	}
@@ -69,6 +71,7 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 			NotFound(w, "user not found")
 			return
 		}
+		slog.Error("get user failed", "error", err, "id", id)
 		InternalError(w)
 		return
 	}
@@ -98,6 +101,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.svc.CreateUser(r.Context(), req.Name, req.Email)
 	if err != nil {
+		slog.Error("create user failed", "error", err, "email", req.Email)
 		InternalError(w)
 		return
 	}
@@ -139,6 +143,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			NotFound(w, "user not found")
 			return
 		}
+		slog.Error("update user failed", "error", err, "id", id)
 		InternalError(w)
 		return
 	}
@@ -172,6 +177,7 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 			NotFound(w, "user not found")
 			return
 		}
+		slog.Error("delete user failed", "error", err, "id", id)
 		InternalError(w)
 		return
 	}
