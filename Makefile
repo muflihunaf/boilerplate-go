@@ -1,4 +1,4 @@
-.PHONY: build run test clean tidy lint
+.PHONY: build run test clean tidy lint swagger swagger-install
 
 # Build variables
 BINARY_NAME=api
@@ -71,4 +71,18 @@ docker-build:
 # Docker run
 docker-run:
 	docker run -p 8080:8080 $(BINARY_NAME)
+
+# Install swag CLI
+swagger-install:
+	go install github.com/swaggo/swag/cmd/swag@latest
+
+# Generate Swagger documentation
+swagger:
+	@echo "Generating Swagger docs..."
+	go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/api/main.go -o docs --parseDependency --parseInternal
+	@echo "Swagger docs generated in docs/"
+
+# Format Swagger annotations
+swagger-fmt:
+	go run github.com/swaggo/swag/cmd/swag@latest fmt
 

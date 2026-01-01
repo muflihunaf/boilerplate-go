@@ -10,32 +10,43 @@ import (
 
 // LoginRequest represents the login request body.
 type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=6"`
+	Email    string `json:"email" validate:"required,email" example:"user@example.com"`
+	Password string `json:"password" validate:"required,min=6" example:"secret123"`
 }
 
 // RegisterRequest represents the registration request body.
 type RegisterRequest struct {
-	Name     string `json:"name" validate:"required,min=2,max=100"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=6"`
+	Name     string `json:"name" validate:"required,min=2,max=100" example:"John Doe"`
+	Email    string `json:"email" validate:"required,email" example:"user@example.com"`
+	Password string `json:"password" validate:"required,min=6" example:"secret123"`
 }
 
 // AuthResponse represents the authentication response.
 type AuthResponse struct {
-	Token     string       `json:"token"`
-	ExpiresIn int64        `json:"expires_in"`
+	Token     string       `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	ExpiresIn int64        `json:"expires_in" example:"86400"`
 	User      UserResponse `json:"user"`
 }
 
 // UserResponse represents user data in responses.
 type UserResponse struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID    string `json:"id" example:"abc123def456"`
+	Name  string `json:"name" example:"John Doe"`
+	Email string `json:"email" example:"user@example.com"`
 }
 
-// Login authenticates a user and returns a JWT token.
+// Login godoc
+// @Summary      User login
+// @Description  Authenticate user with email and password
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      LoginRequest  true  "Login credentials"
+// @Success      200      {object}  AuthResponse
+// @Failure      400      {object}  response.Response
+// @Failure      401      {object}  response.Response
+// @Failure      500      {object}  response.Response
+// @Router       /auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -61,7 +72,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	JSON(w, http.StatusOK, AuthResponse{
 		Token:     result.Token,
-		ExpiresIn: 86400, // 24 hours in seconds
+		ExpiresIn: 86400,
 		User: UserResponse{
 			ID:    result.User.ID,
 			Name:  result.User.Name,
@@ -70,7 +81,18 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Register creates a new user and returns a JWT token.
+// Register godoc
+// @Summary      User registration
+// @Description  Create a new user account
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      RegisterRequest  true  "Registration details"
+// @Success      201      {object}  AuthResponse
+// @Failure      400      {object}  response.Response
+// @Failure      409      {object}  response.Response
+// @Failure      500      {object}  response.Response
+// @Router       /auth/register [post]
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -110,7 +132,18 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Me returns the current authenticated user's information.
+// Me godoc
+// @Summary      Get current user
+// @Description  Returns the authenticated user's profile
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  UserResponse
+// @Failure      401  {object}  response.Response
+// @Failure      404  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /me [get]
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {

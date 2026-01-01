@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/go-chi/chi/v5"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	"github.com/muflihunaf/boilerplate-go/internal/handler"
 	"github.com/muflihunaf/boilerplate-go/internal/middleware"
@@ -36,6 +37,14 @@ func registerPublicRoutes(r chi.Router, h *handler.Handler) {
 
 	// Ready check (can add DB ping, etc.)
 	r.Get("/ready", h.Health)
+
+	// Swagger documentation
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"),
+		httpSwagger.DeepLinking(true),
+		httpSwagger.DocExpansion("list"),
+		httpSwagger.DomID("swagger-ui"),
+	))
 }
 
 // registerAuthRoutes sets up authentication routes.
@@ -64,4 +73,3 @@ func registerUserRoutes(r chi.Router, h *handler.Handler) {
 func registerProfileRoutes(r chi.Router, h *handler.Handler) {
 	r.Get("/me", h.Me)
 }
-
